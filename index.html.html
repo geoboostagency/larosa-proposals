@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Proposal — La Rosa Gastrobar</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #2C4A35;
+    --coral: #D4756A;
+    --cream: #F7F2EA;
+    --cream-dark: #EDE5D8;
+    --text: #1a2e20;
+    --text-muted: #6b7c6e;
+    --gold: #C9A96E;
+  }
+
+  body {
+    background-color: var(--cream);
+    color: var(--text);
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  /* LOADING STATE */
+  #loadingScreen {
+    position: fixed; inset: 0;
+    background: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  #loadingScreen.hide { opacity: 0; pointer-events: none; }
+  .loading-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem; font-weight: 300; font-style: italic;
+    color: var(--cream); letter-spacing: 0.1em;
+    animation: pulse 1.5s ease infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* EXPIRED / ERROR STATE */
+  #errorScreen {
+    display: none; position: fixed; inset: 0;
+    background: var(--green);
+    align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; padding: 40px; z-index: 9998;
+  }
+  #errorScreen.show { display: flex; }
+  #errorScreen h2 { font-family:'Cormorant Garamond',serif; font-size:2rem; color:var(--cream); margin-bottom:12px; }
+  #errorScreen p  { color:rgba(247,242,234,0.6); font-size:0.9rem; max-width:360px; line-height:1.7; }
+
+  /* HEADER */
+  header {
+    background: var(--green); padding: 28px 48px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 100;
+    animation: slideDown 0.6s ease both;
+  }
+  @keyframes slideDown { from{transform:translateY(-100%);opacity:0} to{transform:translateY(0);opacity:1} }
+  .logo { font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:300; color:var(--cream); letter-spacing:0.08em; font-style:italic; }
+  .badge { background:var(--coral); color:white; font-size:0.7rem; font-weight:500; letter-spacing:0.15em; text-transform:uppercase; padding:6px 16px; border-radius:20px; }
+
+  /* HERO */
+  .hero {
+    background: var(--green); padding: 80px 48px 100px;
+    position: relative; overflow: hidden;
+    animation: fadeUp 0.8s ease 0.2s both;
+  }
+  .hero::after {
+    content:''; position:absolute; bottom:-2px; left:0; right:0;
+    height:60px; background:var(--cream);
+    clip-path: ellipse(55% 100% at 50% 100%);
+  }
+  .hero-inner { max-width:760px; margin:0 auto; text-align:center; }
+  .hero-eyebrow { font-size:0.72rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin-bottom:20px; }
+  .hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(2.4rem,5vw,3.6rem); font-weight:300; color:var(--cream); line-height:1.15; margin-bottom:16px; }
+  .hero h1 em { font-style:italic; color:var(--gold); }
+  .hero-sub { color:rgba(247,242,234,0.6); font-size:0.9rem; letter-spacing:0.04em; }
+
+  /* COUNTDOWN */
+  .countdown-wrap { display:flex; justify-content:center; margin-top:40px; }
+  .countdown-item { text-align:center; padding:0 24px; border-right:1px solid rgba(247,242,234,0.15); }
+  .countdown-item:last-child { border-right:none; }
+  .countdown-num { font-family:'Cormorant Garamond',serif; font-size:2.8rem; font-weight:300; color:var(--cream); display:block; line-height:1; }
+  .countdown-label { font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:rgba(247,242,234,0.45); margin-top:4px; }
+
+  /* CONTENT */
+  .content { max-width:820px; margin:0 auto; padding:60px 24px 120px; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+  /* CARDS */
+  .card { background:white; border-radius:4px; padding:40px 44px; margin-bottom:20px; border:1px solid var(--cream-dark); animation:fadeUp 0.7s ease both; }
+  .card:nth-child(1){animation-delay:0.3s} .card:nth-child(2){animation-delay:0.45s}
+  .card:nth-child(3){animation-delay:0.6s} .card:nth-child(4){animation-delay:0.75s}
+
+  .card-label { font-size:0.65rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--coral); font-weight:500; margin-bottom:22px; display:flex; align-items:center; gap:10px; }
+  .card-label::after { content:''; flex:1; height:1px; background:var(--cream-dark); }
+  .card h2 { font-family:'Cormorant Garamond',serif; font-size:1.7rem; font-weight:400; color:var(--green); margin-bottom:24px; }
+
+  /* DETAILS GRID */
+  .details-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--cream-dark); border:1px solid var(--cream-dark); border-radius:4px; overflow:hidden; }
+  .detail-item { background:var(--cream); padding:20px 22px; }
+  .detail-key { font-size:0.65rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
+  .detail-val { font-family:'Cormorant Garamond',serif; font-size:1.15rem; color:var(--text); }
+
+  /* MENU */
+  .menu-section { margin-bottom:28px; }
+  .menu-section h3 { font-family:'Cormorant Garamond',serif; font-size:1.05rem; font-style:italic; color:var(--green); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--cream-dark); }
+  .menu-item { padding:8px 0; border-bottom:1px dotted var(--cream-dark); font-size:0.9rem; }
+  .menu-item:last-child { border-bottom:none; }
+  .menu-item-name { font-weight:400; }
+  .menu-item-desc { font-size:0.8rem; color:var(--text-muted); margin-top:2px; font-style:italic; }
+  .menu-note { background:var(--cream); border-left:3px solid var(--gold); padding:12px 16px; font-size:0.82rem; color:var(--text-muted); margin-top:16px; font-style:italic; border-radius:0 4px 4px 0; }
+
+  /* PRICING */
+  .pricing-rows { border:1px solid var(--cream-dark); border-radius:4px; overflow:hidden; }
+  .price-row { display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--cream-dark); font-size:0.88rem; }
+  .price-row:last-child { border-bottom:none; }
+  .price-row.total { background:var(--green); color:var(--cream); padding:20px 22px; }
+  .price-row.deposit { background:var(--cream); color:var(--coral); font-weight:500; }
+  .price-val { font-family:'Cormorant Garamond',serif; font-size:1.2rem; }
+  .price-row.total .price-val { font-size:1.5rem; color:var(--gold); }
+
+  /* TERMS */
+  .terms-box { background:var(--cream); border:1px solid var(--cream-dark); border-radius:4px; padding:28px; max-height:220px; overflow-y:auto; font-size:0.82rem; line-height:1.75; color:var(--text-muted); margin-bottom:28px; }
+  .terms-box::-webkit-scrollbar { width:4px; }
+  .terms-box::-webkit-scrollbar-thumb { background:var(--green); border-radius:2px; }
+  .terms-box h4 { font-family:'Cormorant Garamond',serif; font-size:0.95rem; color:var(--text); margin:16px 0 6px; font-style:italic; }
+  .terms-box h4:first-child { margin-top:0; }
+
+  /* SIGNATURE */
+  .signature-area { margin-bottom:28px; }
+  .sig-label { font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; display:block; }
+  .sig-input-wrap { border-bottom:2px solid var(--green); padding-bottom:8px; }
+  .sig-input { width:100%; border:none; background:transparent; font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--green); outline:none; font-style:italic; }
+  .sig-input::placeholder { color:var(--cream-dark); font-style:italic; }
+  .sig-line-label { font-size:0.65rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); margin-top:6px; }
+
+  /* CHECKBOX */
+  .checkbox-group { display:flex; align-items:flex-start; gap:14px; margin-bottom:32px; }
+  .custom-checkbox { width:20px; height:20px; min-width:20px; border:2px solid var(--green); border-radius:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; margin-top:1px; transition:background 0.2s; }
+  .custom-checkbox.checked { background:var(--green); }
+  .custom-checkbox svg { display:none; }
+  .custom-checkbox.checked svg { display:block; }
+  .checkbox-text { font-size:0.83rem; color:var(--text-muted); line-height:1.6; }
+  .checkbox-text strong { color:var(--text); }
+
+  /* CTA */
+  .cta-btn { width:100%; background:var(--coral); color:white; border:none; padding:20px 32px; font-family:'Jost',sans-serif; font-size:0.8rem; font-weight:500; letter-spacing:0.22em; text-transform:uppercase; cursor:pointer; border-radius:2px; transition:background 0.25s; position:relative; overflow:hidden; }
+  .cta-btn:hover { background:#c4665b; }
+  .cta-btn:disabled { background:var(--cream-dark); color:var(--text-muted); cursor:not-allowed; }
+  .cta-note { text-align:center; font-size:0.75rem; color:var(--text-muted); margin-top:14px; letter-spacing:0.04em; }
+  .cta-note span { color:var(--green); font-weight:500; }
+
+  /* SUCCESS OVERLAY */
+  #successOverlay { display:none; position:fixed; inset:0; background:rgba(44,74,53,0.97); z-index:999; align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:40px; }
+  #successOverlay.show { display:flex; animation:fadeUp 0.5s ease; }
+  .success-icon { width:72px; height:72px; border:2px solid var(--gold); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 28px; }
+  #successOverlay h2 { font-family:'Cormorant Garamond',serif; font-size:2.4rem; color:var(--cream); font-weight:300; margin-bottom:12px; }
+  #successOverlay p { color:rgba(247,242,234,0.6); font-size:0.9rem; max-width:400px; line-height:1.7; margin-bottom:32px; }
+  .pay-btn { background:var(--coral); color:white; border:none; padding:18px 48px; font-family:'Jost',sans-serif; font-size:0.78rem; font-weight:500; letter-spacing:0.2em; text-transform:uppercase; cursor:pointer; border-radius:2px; }
+
+  footer { background:var(--green); padding:32px 48px; text-align:center; }
+  .footer-logo { font-family:'Cormorant Garamond',serif; font-size:1.2rem; font-weight:300; color:rgba(247,242,234,0.5); font-style:italic; }
+  .footer-sub { font-size:0.7rem; letter-spacing:0.18em; text-transform:uppercase; color:rgba(247,242,234,0.25); margin-top:8px; }
+
+  @media(max-width:640px) {
+    header { padding:20px 24px; }
+    .hero { padding:60px 24px 80px; }
+    .card { padding:28px 24px; }
+    .details-grid { grid-template-columns:repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen"><div class="loading-logo">La Rosa Gastrobar</div></div>
+
+<!-- ERROR / EXPIRED -->
+<div id="errorScreen">
+  <h2 id="errorTitle">Proposal Unavailable</h2>
+  <p id="errorMsg">This proposal has expired or is no longer available. Please contact us to request a new one.</p>
+</div>
+
+<!-- SUCCESS OVERLAY -->
+<div id="successOverlay">
+  <div class="success-icon">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9A96E" stroke-width="1.5"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <h2>Proposal Accepted</h2>
+  <p>Your signature has been recorded. Please proceed with the $500 deposit to officially confirm your reservation.</p>
+  <button class="pay-btn" id="payBtn">Pay Deposit · $500</button>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">La Rosa Gastrobar</div>
+  <div class="badge">Active Proposal</div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Private Event Proposal</div>
+    <h1>Hello, <em id="heroName">...</em> —<br>your event is ready</h1>
+    <p class="hero-sub">This proposal was prepared exclusively for you · Valid for 72 hours</p>
+    <div class="countdown-wrap">
+      <div class="countdown-item"><span class="countdown-num" id="cdH">--</span><div class="countdown-label">Hours</div></div>
+      <div class="countdown-item"><span class="countdown-num" id="cdM">--</span><div class="countdown-label">Minutes</div></div>
+      <div class="countdown-item"><span class="countdown-num" id="cdS">--</span><div class="countdown-label">Seconds</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- 01 · EVENT DETAILS -->
+  <div class="card">
+    <div class="card-label">01 · Event Details</div>
+    <div class="details-grid">
+      <div class="detail-item"><div class="detail-key">Date</div><div class="detail-val" id="evDate">—</div></div>
+      <div class="detail-item"><div class="detail-key">Schedule</div><div class="detail-val" id="evTime">—</div></div>
+      <div class="detail-item"><div class="detail-key">Guests</div><div class="detail-val" id="evGuests">—</div></div>
+      <div class="detail-item"><div class="detail-key">Event Type</div><div class="detail-val" id="evType">—</div></div>
+      <div class="detail-item"><div class="detail-key">Venue</div><div class="detail-val" id="evArea">—</div></div>
+      <div class="detail-item"><div class="detail-key">Package</div><div class="detail-val" id="evPackage">—</div></div>
+    </div>
+  </div>
+
+  <!-- 02 · PROPOSED MENU -->
+  <div class="card">
+    <div class="card-label">02 · Proposed Menu</div>
+    <h2>Custom Menu</h2>
+    <div id="menuContent" style="white-space:pre-line; font-size:0.9rem; line-height:1.8; color:var(--text);">—</div>
+    <div style="margin-top:20px;">
+      <div class="menu-section">
+        <h3>Beverages / Bar</h3>
+        <div class="menu-item"><div class="menu-item-name" id="evBeverages">—</div></div>
+      </div>
+    </div>
+    <div class="menu-note" id="evDietary" style="display:none"></div>
+  </div>
+
+  <!-- 03 · INVESTMENT -->
+  <div class="card">
+    <div class="card-label">03 · Investment</div>
+    <div class="pricing-rows">
+      <div class="price-row">
+        <span class="price-label">Menu per person</span>
+        <span class="price-val" id="pricePerPerson">—</span>
+      </div>
+      <div class="price-row">
+        <span class="price-label" id="guestCountLabel">Guests</span>
+        <span class="price-val" id="subtotal">—</span>
+      </div>
+      <div class="price-row total">
+        <span class="price-label">Event Total</span>
+        <span class="price-val" id="totalEstimate">—</span>
+      </div>
+      <div class="price-row deposit">
+        <span class="price-label">Deposit to secure date · <em style="font-weight:300">balance due on event day</em></span>
+        <span class="price-val" id="depositAmount">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 · TERMS & SIGNATURE -->
+  <div class="card">
+    <div class="card-label">04 · Terms & Digital Signature</div>
+    <h2>Reservation Policy</h2>
+
+    <div class="terms-box">
+      <h4>1. Deposit & Confirmation</h4>
+      To confirm the event reservation, the client must submit a non-refundable deposit within 72 hours of this proposal being issued. The date will only be blocked upon receipt of the deposit. La Rosa Gastrobar does not guarantee date availability until payment is confirmed.
+
+      <h4>2. Cancellation by Client</h4>
+      If the client cancels more than 30 days before the event, the deposit will be applied as a credit toward a future event within the next 12 months. If cancellation occurs less than 30 days before the event, the deposit will be forfeited in full. For events with a total value exceeding $2,000, a second payment of 50% of the remaining balance will be required 14 days before the event.
+
+      <h4>3. Menu & Modifications</h4>
+      The menu agreed upon in this proposal is what will be served on the day of the event. Any modifications must be requested at least 7 days in advance and are subject to availability and possible price adjustments. La Rosa Gastrobar reserves the right to substitute ingredients due to seasonal availability, always maintaining the agreed quality standard.
+
+      <h4>4. Guest Count</h4>
+      Variations of up to 10% of the confirmed guest count can be accommodated at no extra cost with 48 hours notice. Variations exceeding 10% are subject to proportional price adjustment.
+
+      <h4>5. Schedule & Duration</h4>
+      The event will have the duration agreed upon in this proposal. Time extensions are available at $300/additional hour, subject to space and staff availability.
+
+      <h4>6. Responsibilities</h4>
+      The client is responsible for the behavior of their guests within the premises. Any damage to the property will be billed to the client. La Rosa Gastrobar reserves the right to end the event if guest behavior poses a risk to staff or property.
+    </div>
+
+    <div class="signature-area">
+      <span class="sig-label">Your digital signature</span>
+      <div class="sig-input-wrap">
+        <input type="text" class="sig-input" id="signatureInput" placeholder="Type your full name here">
+      </div>
+      <div class="sig-line-label">Full name · serves as legal signature</div>
+    </div>
+
+    <div class="checkbox-group">
+      <div class="custom-checkbox" id="termsCheck">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="checkbox-text">
+        I have read and agree to the <strong>Terms & Conditions</strong> of La Rosa Gastrobar. I understand that by clicking "Accept & Proceed to Payment", this digital signature has legal validity and I commit to submitting the deposit to confirm the date.
+      </div>
+    </div>
+
+    <button class="cta-btn" id="ctaBtn" disabled>Accept Proposal & Proceed to Payment</button>
+    <div class="cta-note">Secure payment processed by <span>Wix Payments</span> · SSL encrypted</div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-logo">La Rosa Gastrobar</div>
+  <div class="footer-sub">382 Miracle Mile · Coral Gables, FL · events@larosagastrobar.com</div>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let proposalData  = null;
+let termsChecked  = false;
+let countdownTimer = null;
+
+// ─────────────────────────────────────────────
+// 1. LISTEN FOR DATA FROM VELO (postMessage)
+// ─────────────────────────────────────────────
+window.addEventListener('message', function(event) {
+  // Accept messages from Wix parent
+  const data = event.data;
+  if (!data || data.type !== 'PROPOSAL_DATA') return;
+
+  proposalData = data.payload;
+
+  if (proposalData.error) {
+    showError(proposalData.errorTitle || 'Unavailable', proposalData.error);
+    return;
+  }
+
+  renderProposal(proposalData);
+  hideLoading();
+});
+
+// ─────────────────────────────────────────────
+// 2. RENDER ALL DATA INTO THE PAGE
+// ─────────────────────────────────────────────
+function renderProposal(d) {
+  // Hero
+  document.getElementById('heroName').textContent = d.clientName || 'Guest';
+
+  // Event details
+  document.getElementById('evDate').textContent    = formatDate(d.eventDate);
+  document.getElementById('evTime').textContent    = (d.startTime && d.endTime) ? `${d.startTime} – ${d.endTime}` : '—';
+  document.getElementById('evGuests').textContent  = d.guestCount ? `${d.guestCount} guests` : '—';
+  document.getElementById('evType').textContent    = d.eventType || '—';
+  document.getElementById('evArea').textContent    = d.eventArea || '—';
+  document.getElementById('evPackage').textContent = d.packageSelected || '—';
+
+  // Menu
+  document.getElementById('menuContent').textContent  = d.menuProposed || '—';
+  document.getElementById('evBeverages').textContent  = d.beverageOptions || '—';
+
+  if (d.dietaryRestrictions) {
+    const note = document.getElementById('evDietary');
+    note.textContent = '⚠ Dietary restrictions: ' + d.dietaryRestrictions;
+    note.style.display = 'block';
+  }
+
+  // Pricing
+  const ppp      = d.pricePerPerson || 0;
+  const guests   = d.guestCount || 0;
+  const subtotal = ppp * guests;
+  document.getElementById('pricePerPerson').textContent  = ppp ? `$${ppp}` : '—';
+  document.getElementById('guestCountLabel').textContent = `${guests} guests`;
+  document.getElementById('subtotal').textContent        = subtotal ? `$${subtotal.toLocaleString()}` : '—';
+  document.getElementById('totalEstimate').textContent   = d.totalEstimate ? `$${d.totalEstimate.toLocaleString()}` : '—';
+  document.getElementById('depositAmount').textContent   = d.depositAmount ? `$${d.depositAmount}` : '—';
+
+  // Countdown
+  if (d.proposalExpirationDate) {
+    startCountdown(new Date(d.proposalExpirationDate));
+  }
+
+  // If already signed — lock the form
+  if (d.termsAccepted) {
+    lockForm('✓ Proposal already accepted. Your payment link has been sent.');
+  }
+}
+
+// ─────────────────────────────────────────────
+// 3. COUNTDOWN
+// ─────────────────────────────────────────────
+function startCountdown(expirationDate) {
+  const tick = () => {
+    const diff = expirationDate - new Date();
+    if (diff <= 0) {
+      document.getElementById('cdH').textContent = '00';
+      document.getElementById('cdM').textContent = '00';
+      document.getElementById('cdS').textContent = '00';
+      lockForm('This proposal has expired.');
+      clearInterval(countdownTimer);
+      return;
+    }
+    document.getElementById('cdH').textContent = String(Math.floor(diff / 3600000)).padStart(2,'0');
+    document.getElementById('cdM').textContent = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+    document.getElementById('cdS').textContent = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+// ─────────────────────────────────────────────
+// 4. FORM INTERACTIONS
+// ─────────────────────────────────────────────
+document.getElementById('signatureInput').addEventListener('input', checkReady);
+
+document.getElementById('termsCheck').addEventListener('click', function() {
+  termsChecked = !termsChecked;
+  this.classList.toggle('checked', termsChecked);
+  checkReady();
+});
+
+function checkReady() {
+  const name = document.getElementById('signatureInput').value.trim();
+  document.getElementById('ctaBtn').disabled = !(name.length >= 3 && termsChecked);
+}
+
+// ─────────────────────────────────────────────
+// 5. ACCEPT — send signature back to Velo
+// ─────────────────────────────────────────────
+document.getElementById('ctaBtn').addEventListener('click', function() {
+  const signatureName = document.getElementById('signatureInput').value.trim();
+  if (!signatureName || !termsChecked) return;
+
+  // Disable button to prevent double submit
+  this.disabled = true;
+  this.textContent = 'Processing...';
+
+  // Send signature to Velo via postMessage
+  window.parent.postMessage({
+    type: 'PROPOSAL_SIGNED',
+    payload: {
+      itemId        : proposalData._id,
+      signatureName : signatureName,
+      signedAt      : new Date().toISOString()
+    }
+  }, '*');
+});
+
+// ─────────────────────────────────────────────
+// 6. LISTEN FOR VELO RESPONSE AFTER SIGNING
+// ─────────────────────────────────────────────
+window.addEventListener('message', function(event) {
+  const data = event.data;
+  if (!data) return;
+
+  // Velo confirmed signature saved → show success + open payment
+  if (data.type === 'SIGN_SUCCESS') {
+    document.getElementById('successOverlay').classList.add('show');
+    document.getElementById('payBtn').onclick = function() {
+      window.parent.postMessage({ type: 'OPEN_PAYMENT', payload: { url: data.paymentUrl } }, '*');
+    };
+  }
+
+  // Velo reported an error saving
+  if (data.type === 'SIGN_ERROR') {
+    const btn = document.getElementById('ctaBtn');
+    btn.disabled = false;
+    btn.textContent = 'Accept Proposal & Proceed to Payment';
+    alert('Something went wrong. Please try again.');
+  }
+});
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function formatDate(val) {
+  if (!val) return '—';
+  return new Date(val).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+
+function hideLoading() {
+  const el = document.getElementById('loadingScreen');
+  el.classList.add('hide');
+  setTimeout(() => el.style.display = 'none', 500);
+}
+
+function showError(title, msg) {
+  hideLoading();
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent   = msg;
+  document.getElementById('errorScreen').classList.add('show');
+}
+
+function lockForm(msg) {
+  document.getElementById('ctaBtn').disabled = true;
+  document.getElementById('ctaBtn').textContent = msg;
+  document.getElementById('signatureInput').disabled = true;
+  document.getElementById('termsCheck').style.pointerEvents = 'none';
+}
+
+// ─────────────────────────────────────────────
+// FALLBACK: if no message received in 8s, show timeout
+// ─────────────────────────────────────────────
+setTimeout(() => {
+  if (!proposalData) {
+    showError('Connection Error', 'Unable to load proposal data. Please refresh the page or contact us directly.');
+  }
+}, 8000);
+</script>
+</body>
+</html>
