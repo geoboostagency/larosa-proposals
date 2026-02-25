@@ -325,6 +325,158 @@
 </footer>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ─────────────────────────────────────────────
+// READ DATA FROM URL PARAMS (passed by Velo)
+// ─────────────────────────────────────────────
+let proposalData = null;
+let termsChecked = false;
+let countdownTimer = null;
+
+function loadFromURL() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('error')) {
+    showError(p.get('errorTitle') || 'Unavailable', p.get('error'));
+    return;
+  }
+  if (!p.get('id')) {
+    setTimeout(() => { if (!proposalData) showError('Connection Error', 'Unable to load proposal. Please contact us.'); }, 3000);
+    return;
+  }
+  proposalData = {
+    _id: p.get('id'), clientName: p.get('name'), clientEmail: p.get('email'),
+    eventDate: p.get('eventDate'), eventType: p.get('eventType'), guestCount: p.get('guests'),
+    eventArea: p.get('area'), startTime: p.get('startTime'), endTime: p.get('endTime'),
+    packageSelected: p.get('package'), menuProposed: p.get('menu'),
+    beverageOptions: p.get('beverages'), dietaryRestrictions: p.get('dietary'),
+    pricePerPerson: p.get('ppp'), totalEstimate: p.get('total'),
+    depositAmount: p.get('deposit'), paymentLinkUrl: p.get('payUrl'),
+    proposalExpirationDate: p.get('expiration'), termsAccepted: p.get('signed') === '1'
+  };
+  renderProposal(proposalData);
+  hideLoading();
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function renderProposal(d) {
+  document.getElementById('heroName').textContent = d.clientName || 'Guest';
+  document.getElementById('evDate').textContent    = formatDate(d.eventDate);
+  document.getElementById('evTime').textContent    = (d.startTime && d.endTime) ? d.startTime + ' – ' + d.endTime : '—';
+  document.getElementById('evGuests').textContent  = d.guestCount ? d.guestCount + ' guests' : '—';
+  document.getElementById('evType').textContent    = d.eventType || '—';
+  document.getElementById('evArea').textContent    = d.eventArea || '—';
+  document.getElementById('evPackage').textContent = d.packageSelected || '—';
+  document.getElementById('menuContent').textContent  = d.menuProposed || '—';
+  document.getElementById('evBeverages').textContent  = d.beverageOptions || '—';
+  if (d.dietaryRestrictions) {
+    const note = document.getElementById('evDietary');
+    note.textContent = '⚠ Dietary restrictions: ' + d.dietaryRestrictions;
+    note.style.display = 'block';
+  }
+  const ppp = parseFloat(d.pricePerPerson) || 0;
+  const guests = parseInt(d.guestCount) || 0;
+  document.getElementById('pricePerPerson').textContent  = ppp ? '$' + ppp : '—';
+  document.getElementById('guestCountLabel').textContent = guests + ' guests';
+  document.getElementById('subtotal').textContent        = (ppp && guests) ? '$' + (ppp * guests).toLocaleString() : '—';
+  document.getElementById('totalEstimate').textContent   = d.totalEstimate ? '$' + parseFloat(d.totalEstimate).toLocaleString() : '—';
+  document.getElementById('depositAmount').textContent   = d.depositAmount ? '$' + d.depositAmount : '—';
+  if (d.proposalExpirationDate) startCountdown(new Date(d.proposalExpirationDate));
+  if (d.termsAccepted) lockForm('✓ Proposal already accepted.');
+}
+
+// ─────────────────────────────────────────────
+// COUNTDOWN
+// ─────────────────────────────────────────────
+function startCountdown(exp) {
+  const tick = () => {
+    const diff = exp - new Date();
+    if (diff <= 0) {
+      document.getElementById('cdH').textContent = '00';
+      document.getElementById('cdM').textContent = '00';
+      document.getElementById('cdS').textContent = '00';
+      lockForm('This proposal has expired.');
+      clearInterval(countdownTimer); return;
+    }
+    document.getElementById('cdH').textContent = String(Math.floor(diff / 3600000)).padStart(2,'0');
+    document.getElementById('cdM').textContent = String(Math.floor((diff % 3600000) / 60000)).padStart(2,'0');
+    document.getElementById('cdS').textContent = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+// ─────────────────────────────────────────────
+// FORM
+// ─────────────────────────────────────────────
+document.getElementById('signatureInput').addEventListener('input', checkReady);
+document.getElementById('termsCheck').addEventListener('click', function() {
+  termsChecked = !termsChecked;
+  this.classList.toggle('checked', termsChecked);
+  checkReady();
+});
+function checkReady() {
+  const name = document.getElementById('signatureInput').value.trim();
+  document.getElementById('ctaBtn').disabled = !(name.length >= 3 && termsChecked);
+}
+
+// ─────────────────────────────────────────────
+// ACCEPT — send signature to Velo via postMessage
+// ─────────────────────────────────────────────
+document.getElementById('ctaBtn').addEventListener('click', function() {
+  const signatureName = document.getElementById('signatureInput').value.trim();
+  if (!signatureName || !termsChecked) return;
+  this.disabled = true;
+  this.textContent = 'Processing...';
+  window.parent.postMessage({ type: 'PROPOSAL_SIGNED', payload: { itemId: proposalData._id, signatureName: signatureName, signedAt: new Date().toISOString() } }, '*');
+});
+
+// Listen for Velo response
+window.addEventListener('message', function(event) {
+  const data = event.data;
+  if (!data) return;
+  if (data.type === 'SIGN_SUCCESS') {
+    document.getElementById('successOverlay').classList.add('show');
+    document.getElementById('payBtn').onclick = function() {
+      window.parent.postMessage({ type: 'OPEN_PAYMENT', payload: { url: data.paymentUrl } }, '*');
+    };
+  }
+  if (data.type === 'SIGN_ERROR') {
+    const btn = document.getElementById('ctaBtn');
+    btn.disabled = false;
+    btn.textContent = 'Accept Proposal & Proceed to Payment';
+    alert('Something went wrong. Please try again.');
+  }
+});
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function formatDate(val) {
+  if (!val) return '—';
+  return new Date(val).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+function hideLoading() {
+  const el = document.getElementById('loadingScreen');
+  el.classList.add('hide');
+  setTimeout(() => el.style.display = 'none', 500);
+}
+function showError(title, msg) {
+  hideLoading();
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent   = msg;
+  document.getElementById('errorScreen').classList.add('show');
+}
+function lockForm(msg) {
+  document.getElementById('ctaBtn').disabled = true;
+  document.getElementById('ctaBtn').textContent = msg;
+  document.getElementById('signatureInput').disabled = true;
+  document.getElementById('termsCheck').style.pointerEvents = 'none';
+}
+
+// START
+loadFromURL();
+</script><script>
 // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 // STATE
 // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
@@ -505,20 +657,12 @@ function lockForm(msg) {
 }
 
 // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-// ACTIVELY REQUEST DATA FROM VELO
-function requestData() {
-  window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
-}
-requestData();
-const requestInterval = setInterval(() => {
-  if (!proposalData) { requestData(); } else { clearInterval(requestInterval); }
-}, 1500);
+// Fallback if no data in URL after 3s
 setTimeout(() => {
-  clearInterval(requestInterval);
   if (!proposalData) {
-    showError('Connection Error', 'Unable to load proposal data. Please refresh or contact us.');
+    showError('Connection Error', 'Unable to load proposal data. Please contact us.');
   }
-}, 15000);
+}, 3000);
 </script>
 </body>
 </html>
